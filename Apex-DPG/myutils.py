@@ -15,11 +15,6 @@ import ray
 from segtree import SegmentTree, MinSegmentTree, SumSegmentTree
 
 
-# huber loss
-def huber(x, k=1.0):
-    return torch.where(x.abs() < k, 0.5 * x.pow(2), k * (x.abs() - 0.5 * k))
-
-
 def toTensor(nparray):
     return torch.FloatTensor(nparray).unsqueeze(0)
 

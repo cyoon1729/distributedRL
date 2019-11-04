@@ -40,7 +40,6 @@ class Learner:
         q_lr = config['q_lr']
         policy_lr = config['policy_lr']
         self.tau = config['tau']
-        num_quantiles = config['num_quantiles']
 
         # initialize networks
         self.q_network = create_critic(network_type, obs_dim, action_dim)
@@ -79,20 +78,14 @@ class Learner:
         last_states = torch.FloatTensor(last_states).to(self.device)
         dones = torch.FloatTensor(dones).to(self.device).view(-1, 1)
 
-        dist = self.q_network.forward(states, actions)
+        curr_q = self.q_network.forward(states, actions)
         last_actions = self.target_policy.forward(last_states)
         bootstrap_q = self.target_q_network.forward(last_states, last_actions)
         q_targets = (rewards + (1 - dones) *
                     self.gamma**self.unroll_steps * bootstrap_q)
 
-        distance = q_targets.detach() - dist
-        q_loss = (huber(distance) * 
-                    (self.q_network.tau - (distance.detach() < 0).float()).abs())
-        q_loss = q_loss.mean()
-
-        q_target_values = q_targets.mean(dim=1).detach().view(-1)
-        curr_q_values = dist.mean(dim=1).detach().view(-1)
-        td_error = q_target_values - curr_q_values + eps # prevent priority from being 0
+        td_error = q_targets - curr_q + eps  # prevent priority from being 0
+        q_loss = F.mse_loss(curr_q, q_targets.detach())
 
         if self.use_per:
             weights = torch.FloatTensor(weights).to(self.device).mean()
@@ -104,7 +97,7 @@ class Learner:
         self.q_optimizer.step()
 
         # update policy
-        policy_loss = -self.q_network.forward(states, self.policy.forward(states)).mean(dim=1).mean() 
+        policy_loss = -self.q_network.forward(states, self.policy.forward(states)).mean() 
         self.policy_optimizer.zero_grad()
         policy_loss.backward()
         self.policy_optimizer.step()
@@ -119,7 +112,7 @@ class Learner:
             target_param.data.copy_(self.tau * param + (1 - self.tau) * target_param)
 
         return q_loss, policy_loss, td_error
-    
+
     def return_update_step(self):
         return self.update_step
     

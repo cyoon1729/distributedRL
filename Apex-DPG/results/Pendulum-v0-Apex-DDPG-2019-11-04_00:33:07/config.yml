@@ -1,14 +1,14 @@
 # Environment parameters
 
-env: Pendulum-v0 # HalfCheetahPyBulletEnv-v0 #  # LunarLander-v2 #
+env: Pendulum-v0 #LunarLander-v2 
 device: cpu
 random_seed: 2019
 num_agents: 1
 
 # Training parameters
-model: D4PG
-network_type: QuantileDQN
-batch_size: 256
+model: Apex-DDPG
+network_type: DQN
+batch_size: 32
 num_train_steps: 20000 # number of episodes from all agents
 max_ep_length: 300 # maximum number of steps per episode
 buffer_max_size: 100000 # maximum capacity of replay memory
@@ -18,15 +18,12 @@ priority_beta_start: 0.4 # starting value of beta - controls to what degree IS w
 priority_beta_end: 1.0 # beta will be linearly annelaed from its start value to this value thoughout training
 gamma: 0.99 # Discount rate (gamma) for future rewards
 unroll_steps: 1 # number of future steps to collect experiences for N-step returns
-num_quantiles: 4 # number of quantiles for quantile regression dqn
 
 # Network parameters
 tau: 0.01
-q_lr: 0.0003
-policy_lr: 0.0003
+q_lr: 0.003
+policy_lr: 0.003
 
 
 # Miscellaneous
 results_path: results
-
-
