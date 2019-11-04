@@ -74,8 +74,8 @@ if __name__ == "__main__":
     # processes
     procs = []
     procs.append(learner)    
-    # for actor in actors:
-    #     procs.append(actor)
+    for actor in actors:
+        procs.append(actor)
 
     print("run")
 
