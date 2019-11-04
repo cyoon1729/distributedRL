@@ -4,6 +4,6 @@ Uses Ray for parallelization
 
 Includes:
 
-- Apex-DQN (with Quantile Regression DQN)
-- Apex-DPG
+- Ape-X DQN (with Quantile Regression DQN)
+- Ape-X DPG
 - D4PG (with Quantile Regression DQN instead of C51)
