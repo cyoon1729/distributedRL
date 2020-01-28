@@ -4,8 +4,8 @@ Single-machine implementations of distributed reinforcement learning algorithms 
 
 ### Implementations include:
 
-- Ape-X DQN (also with Quantile Regression DQN)
-- Ape-X DPG
+- ApeX DQN (also with Quantile Regression DQN)
+- ApeX DPG
 - D4PG (with Quantile Regression DQN instead of C51)
 
 #### Planned:
@@ -42,6 +42,7 @@ pyyaml
 - [Distributed Prioritized Experience Replay (Horgan et al., 2018), ICLR 2018](https://arxiv.org/abs/1803.00933)
 - [Distributed Distributional Deterministic Policy Gradients (Barth-Maron et al., 2018), ICLR 2018](https://arxiv.org/abs/1804.08617)
 - [Distributional Reinforcement Learning with Quantile Regression (Dabney et al., 2017), AAAI 2018](https://arxiv.org/abs/1710.10044)
+- [@schatty's implementation of D4PG](https://github.com/schatty/d4pg-pytorch)
 
 
 
