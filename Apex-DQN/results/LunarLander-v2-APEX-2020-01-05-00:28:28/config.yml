@@ -8,7 +8,7 @@ num_agents: 1
 
 # Training parameters
 model: APEX
-network_type: QuantileDQN
+network_type: ConvQuantileDQN
 batch_size: 32
 num_train_steps: 20000 # number of episodes from all agents
 max_ep_length: 300 # maximum number of steps per episode

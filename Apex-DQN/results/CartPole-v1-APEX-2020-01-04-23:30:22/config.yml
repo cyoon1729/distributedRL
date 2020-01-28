@@ -1,6 +1,6 @@
 # Environment parameters
 
-env: LunarLander-v2 
+env: CartPole-v1 #LunarLander-v2 
 actor_device: cpu
 learner_device: cpu
 random_seed: 2019
@@ -13,8 +13,6 @@ batch_size: 32
 num_train_steps: 20000 # number of episodes from all agents
 max_ep_length: 300 # maximum number of steps per episode
 buffer_max_size: 100000 # maximum capacity of replay memory
-actor_buffer_size: 1000 # actor buffer size
-actor_save_interval: 1000 # save rewards at regular intervals
 use_per: True  # use prioritized experience replay
 priority_alpha: 0.6 # controls the randomness vs prioritisation of the prioritised sampling (0.0 = Uniform sampling, 1.0 = Greedy prioritisation)
 priority_beta_start: 0.4 # starting value of beta - controls to what degree IS weights influence the gradient updates to correct for the bias introduces by priority sampling (0 - no correction, 1 - full correction)

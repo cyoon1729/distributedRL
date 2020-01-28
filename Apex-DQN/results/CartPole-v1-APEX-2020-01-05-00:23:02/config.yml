@@ -1,6 +1,6 @@
 # Environment parameters
 
-env: LunarLander-v2 
+env: CartPole-v1 #LunarLander-v2 
 actor_device: cpu
 learner_device: cpu
 random_seed: 2019

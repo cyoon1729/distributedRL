@@ -7,15 +7,18 @@ import gym
 import numpy as np 
 
 from collections import deque
-from myutils import to_n_step, toTensor
+from myutils import to_n_step, toTensor, Buffer
 from models import create_learner
 
 
 @ray.remote
 class Actor(object):
 
-    def __init__(self, worker_id, config, save_dir, buffer_remote, param_server):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    def __init__(self,
+                 worker_id,
+                 config,
+                 save_dir):
+        self.device = config['actor_device']
         self.worker_id = worker_id
 
         env_id = config['env']
@@ -23,6 +26,8 @@ class Actor(object):
         self.unroll_cnt = config['unroll_steps']
         self.num_train_step = config['num_train_steps']
         self.max_ep_length = config['max_ep_length']
+        self.actor_buffer_size = config['actor_buffer_size']
+        self.local_buffer = Buffer(self.actor_buffer_size)
 
         self.env = gym.make(env_id)
         random.seed(worker_id+random_seed)
@@ -30,17 +35,17 @@ class Actor(object):
 
         self.use_distributional = config['use_distributional']
         self.q_network = create_learner(config['network_type'],
-            config['obs_dim'], config['action_dim'], config['num_quantiles'])
+                                        config['obs_dim'],
+                                        config['action_dim'],
+                                        config['num_quantiles'])
         self.eps = 0.2 # epsilon-greedy exploration
 
-        # parallelization
-        self.buffer_remote = buffer_remote
-        self.param_server = param_server
-
         # logging
+        self.actor_save_interval = config['actor_save_interval']
         self.save_dir = save_dir
+        self.episode = 0
+        self.update_step = 0
         self.log = list()
-
 
     def sample(self, state):
         state = torch.FloatTensor(state).unsqueeze(0)
@@ -55,57 +60,78 @@ class Actor(object):
         else:
             return self.env.action_space.sample()
 
-    def sync_with_param_server(self):
-        new_params = ray.get(self.param_server.return_params.remote())
+    def set_params(self, new_params):
         for param, new_param in zip(self.q_network.parameters(), new_params):
-            new_param = torch.Tensor(new_param).to(self.device)
+            new_param = torch.FloatTensor(new_param).to(self.device)
             param.data.copy_(new_param)
 
-    def run(self):
-        time.sleep(3)
+    def start(self):
+        print("Starting actor-{0}".format(self.worker_id))
+        os.makedirs("{0}/agent-{1}".format(self.save_dir, self.worker_id))
+        self.fill_buffer(0, 100)
+
+    def fill_buffer(self, update_step=0, buffer_additions=None):
+        if buffer_additions is None:
+            buffer_additions = self.actor_buffer_size
+        self.update_step = update_step
         transition_buffer = deque(maxlen=self.unroll_cnt + 1)
         state = self.env.reset()
-        episode_reward = 0 
-        episode = 0
-        ep_length = 0
-        update_step = ray.get(self.param_server.get_update_step.remote())
-        
-        while update_step < self.num_train_step:
-            ep_length += 1
+        episode_reward = 0
+        transitions_added = 0
+
+        while transitions_added < buffer_additions:
             action = self.sample(state)  
             next_state, reward, done, _ = self.env.step(action)  
-            transition_buffer.append((state, action, reward, done))
-            episode_reward += reward            
+            transition = (state, action, reward, done)
+            transition_buffer.append(transition)
+            episode_reward += reward        
 
             if len(transition_buffer) == self.unroll_cnt + 1:
-                self.buffer_remote.add.remote(*to_n_step(transition_buffer))
+                self.local_buffer.add(*to_n_step(transition_buffer))
+                transitions_added += 1
 
-            if done or ep_length == self.max_ep_length:
+            if done:
                 # add to log
-                logging = {'update_step': update_step,
-                    'episode': episode, 'episode reward': episode_reward}
+                logging = {'update_step': self.update_step,
+                           'episode': self.episode,
+                           'episode reward': episode_reward}
                 self.log.append(logging)
-
-                # print results locally
-                print(f"Episode {episode}: {episode_reward}")
+                
+                if self.episode % 100 == 0:
+                    print("Actor-{0}, episode {1} : {2}".format(
+                            self.worker_id, self.episode, episode_reward))
 
                 # prepare new rollout
-                episode += 1
+                self.episode += 1
                 episode_reward = 0
-                ep_length = 0
                 transition_buffer.clear()
                 next_state = self.env.reset()
-            
-            if update_step % 3 == 0:
-                self.sync_with_param_server()
-            
+                
+            if self.episode % self.actor_save_interval == 0:
+                save_dir = "{0}/agent-{1}/agent-{1}-rewards.npy".format(
+                               self.save_dir, self.worker_id)
+                np.save(save_dir, 
+                        np.asarray(self.log))
+                           
             state = next_state
-            update_step = ray.get(self.param_server.get_update_step.remote())
-        
+
+    def return_buffer(self):
+        return self.local_buffer.return_buffer()
+
+    def final_save(self):
         # save results in result file
-        print(f"Saving actor-{self.worker_id} data...")
-        os.makedirs(f'{self.save_dir}/agent-{self.worker_id}')
-        with open(f'{self.save_dir}/agent-{self.worker_id}/log.pkl', 'wb') as f:
+        print("Saving actor-{self.worker_id} data...".format(self.worker_id))
+        
+        file_dir = "{0}/agent-{1}/log.pkl".format(
+            self.save_dir, 
+            self.worker_id)
+
+        with open(file_dir, 'wb') as f:
             pickle.dump(self.log, f)
 
-        print(f"Actor-{self.worker_id} exit")
+        print("plotting actor data")
+        plot_agent(
+            "{0}/agent-{1}/log.pkl".format(self.save_dir, self.worker_id),
+            "{0}/agent-{1}".format(self.save_dir, self.worker_id))
+
+        print("Actor-{0} exit".format(self.worker_id))

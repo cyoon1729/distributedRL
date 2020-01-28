@@ -12,9 +12,9 @@ from myutils import huber
 @ray.remote
 class Learner:
 
-    def __init__(self, config, buffer_remote, param_server, save_dir):
+    def __init__(self, config, save_dir):
         # read config 
-        self.device = torch.device(config['device'])
+        self.device = torch.device(config['learner_device'])
         self.num_train_steps = config['num_train_steps']   
 
         # environment_info
@@ -25,11 +25,6 @@ class Learner:
         # buffer info
         self.use_per = config['use_per']
         self.priority_alpha = config['priority_alpha']
-        self.priority_beta_start = config['priority_beta_start']
-        self.priority_beta_end = config['priority_beta_end']
-        self.priority_beta = self.priority_beta_start
-        self.priority_beta_increment = ((self.priority_beta_end - self.priority_beta_start)
-                                        / self.num_train_steps)
         self.batch_size = config['batch_size']
 
         # hyperparameters
@@ -41,10 +36,13 @@ class Learner:
         num_quantiles = config['num_quantiles']
 
         # initialize networks
-        self.q_network = create_learner(network_type, obs_dim, action_dim)
-        self.target_q_network = create_learner(network_type, obs_dim, action_dim)
+        self.q_network = create_learner(network_type,
+                                        obs_dim,
+                                        action_dim)
+        self.target_q_network = create_learner(network_type,
+                                               obs_dim,
+                                               action_dim)
         self.param_list = list(self.q_network.state_dict())
-        self.param_server = param_server
 
         for target_param, param in zip(self.q_network.parameters(),
                                        self.target_q_network.parameters()):
@@ -53,13 +51,12 @@ class Learner:
         # initialize optimizers
         self.q_optimizer = optim.Adam(self.q_network.parameters(), lr=q_lr)
     
-        # parallelization
-        self.buffer_remote = buffer_remote
-        self.update_step = 0
-
         # logging
+        self.update_step = 0 
         self.save_dir = save_dir
         self.log = list()
+        os.makedirs("{0}/learner".format(self.save_dir))
+        os.makedirs("{0}/learner/models".format(self.save_dir))
 
     def optimize_parameters(self, batch, weights, eps=1e-4):
         states, actions, rewards, last_states, dones = batch
@@ -73,7 +70,8 @@ class Learner:
             dist = self.q_network.forward(states)
             dist = dist[torch.arange(dist.size(0)), actions.view(-1)]
             bootstrap_q = self.target_q_network.forward(last_states)
-            bootstrap_q_max = torch.max(bootstrap_q.mean(dim=2), 1, keepdim=True)[0]
+            bootstrap_q_max = torch.max(
+                bootstrap_q.mean(dim=2), 1, keepdim=True)[0]
             q_targets = (rewards + (1 - dones) *
                         self.gamma**self.unroll_steps * bootstrap_q_max)
 
@@ -114,56 +112,53 @@ class Learner:
 
         return q_loss, td_error
     
-    def update_param_server(self):
+    def return_param_list(self):
+        return self.param_list
+    
+    def return_numpy_policy(self):
+        # return numpy state_dict
         params = []
         state_dict = self.q_network.state_dict()
         for param in self.param_list:
-            params.append(state_dict[param].numpy())
-        self.param_server.update_params.remote(params)
-    
-    def return_param_list(self):
-        return self.param_list
+            params.append(state_dict[param].cpu().numpy())
+        
+        return params 
 
     def return_update_step(self):
         return self.update_step
+
+    def learning_step(self, batch, indices, weights):
+        step_info = list(self.optimize_parameters(batch, weights))
+        if self.use_per:
+            _, td_error = step_info
+            new_priorities = td_error.detach().squeeze().abs()
+            new_priorities = new_priorities.cpu().numpy().tolist() 
+        else:
+            None
+        self.update_step += 1
+
+        return step_info, indices, new_priorities
     
-    def run(self):
-        while ray.get(self.buffer_remote.get_size.remote()) < self.batch_size:
-            continue
+    def logger(self, step_info):
+        q_loss, td_error = step_info
+        logging = {
+            'update_step': self.update_step,
+            'q_loss': q_loss.detach().numpy(),
+            'td_error': td_error.detach().numpy(),
+        }
+        self.log.append(logging)
 
-        while self.update_step < self.num_train_steps:
-            # fetch batch
-            if self.use_per:
-                batch, indices, weights = ray.get(
-                    self.buffer_remote.sample.remote(self.batch_size, self.priority_beta))
-                self.priority_beta += self.priority_beta_increment
-            else:
-                batch = ray.get(self.buffer_remote.sample.remote(self.batch_size))
-                weights = None   # weights are set to none because no prioritized replay
-
-            # update parameters
-            q_loss, td_error = self.optimize_parameters(batch, weights)
-
-            # update prioritized for prioritized experience replay
-            if self.use_per:
-                new_priorities = td_error.detach().squeeze().abs().cpu().numpy().tolist() 
-                self.buffer_remote.update_priorities.remote(indices, new_priorities)
-
-            # log
-            logging = {'update_step': self.update_step, 'q_loss': q_loss, 'td_error': td_error}
-            self.log.append(logging)
-
-            # sync with global
-            self.update_param_server()
-            self.update_step += 1
-
-            if self.update_step % 100 == 0:
-                print(f"learner update step: {self.update_step}")
-
-        # save results in result file
-        print("Saving learner data...")
-        os.makedirs(f'{self.save_dir}/learner')
-        with open(f'{self.save_dir}/learner/log.pkl', 'wb') as f:
-            pickle.dump(self.log, f)
-
-        print("Learner exit")
+        if self.update_step % 100 == 0:
+            learner_state = {
+                'epoch': self.update_step,
+                'q_state_dict': self.q_network.state_dict(),
+                'q_optimizer': self.q_optimizer.state_dict(),
+            }
+            torch.save(
+                learner_state,
+                "{0}/learner/models/learner_state-{1}.pth".format(
+                    self.save_dir,
+                    self.update_step)
+            )
+            
+            print("learner update step: {0}".format(self.update_step))
