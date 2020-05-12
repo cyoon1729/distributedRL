@@ -4,8 +4,8 @@ Single-machine implementations of distributed reinforcement learning algorithms 
 
 ### Implementations include:
 
-- ApeX DQN (also with Quantile Regression DQN)
-- ApeX DPG
+- ApeX DQN (also with Quantile Regression DQN) (Currently fixing memory leak issues)
+- ApeX DPG (Currently fixing memory leak issues)
 - D4PG (with Quantile Regression DQN instead of C51)
 
 #### Planned:
