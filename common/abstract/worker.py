@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import deque
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 import torch.nn as nn
@@ -22,15 +22,18 @@ class Worker(ABC):
         self.env = env
         self.env = env.seed(seed)
         self.buffer = deque()
+        self.nstep_queue = deque()
 
     @abstractmethod
     def select_action(self, state: np.ndarray) -> np.ndarray:
-        return
+        pass
 
     @abstractmethod
-    def environment_step(self, state: np.ndarray, action: np.ndarray) -> Tuple, bool:
+    def environment_step(
+        self, state: np.ndarray, action: np.ndarray
+    ) -> Union[Tuple, bool]:
         """Run one gym step"""
-        return
+        pass
 
     @abstractmethod
     def write_log(self):
@@ -52,7 +55,7 @@ class Worker(ABC):
 
             if self.num_step == 1:
                 self.buffer.append(transition)
-            
+
             if self.num_steps > 1:
                 self.nstep_queue.append(transition)
                 if (len(self.nstep_queue) == self.num_steps) or done:

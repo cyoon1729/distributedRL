@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 
 import numpy as np
 import torch.nn as nn
-from copy import deepcopy
 
 
 class Learner(ABC):

@@ -1,5 +1,5 @@
+import numpy as np
 import ray
-import numpy as np 
 
 
 @ray.remote
@@ -8,13 +8,13 @@ class ParameterServer(object):
         self.params = []
 
     def initialize(self, initial_params):
-    	for param in initial_params:
-    		self.params.append(param)
+        for param in initial_params:
+            self.params.append(param)
 
     def update_params(self, new_params):
-    	"""Receive and synchronize new parameters"""
-    	for new_param, idx in zip(new params, range(len(new_params))):
-    		self.params[idx] = new_param
+        """Receive and synchronize new parameters"""
+        for new_param, idx in zip(new_params, range(len(new_params))):
+            self.params[idx] = new_param
 
     def get_params(self):
         return self.params
