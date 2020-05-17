@@ -1,14 +1,22 @@
 from abc import ABC, abstractmethod
-
-import numpy as np 
 from collections import deque
+from typing import Tuple
+
+import numpy as np
 import torch.nn as nn
+
 import gym
 
 
 class Worker(ABC):
-
-    def __init__(self, worker_id: int, worker_brain: nn.Module, env: gym.Env, seed: int, cfg: dict)
+    def __init__(
+        self,
+        worker_id: int,
+        worker_brain: nn.Module,
+        env: gym.Env,
+        seed: int,
+        cfg: dict,
+    ):
         self.cfg
         self.brain = copy.deepcopy(worker_brain)
         self.env = env
@@ -16,21 +24,46 @@ class Worker(ABC):
         self.buffer = deque()
 
     @abstractmethod
-    def select_action(self, state: np.ndarray)
-        pass 
-
-    def step(self, state:np.ndarray, action: np.ndarray):
-        """Run one gym step"""
-        action = self.select_action(state)
-        next_state, reward, done, _ = self.env.step(action)
-        return next_state, reward, next_state, done 
+    def select_action(self, state: np.ndarray) -> np.ndarray:
+        return
 
     @abstractmethod
-    def work(self):
-        """Fill worker buffer until some stopping criterion is satisfied"""
+    def environment_step(self, state: np.ndarray, action: np.ndarray) -> Tuple, bool:
+        """Run one gym step"""
+        return
+
+    @abstractmethod
+    def write_log(self):
         pass
-    
-    def return_buffer(self):
+
+    @abstractmethod
+    def stopping_criterion(self) -> bool:
+        pass
+
+    def collect_data(self):
+        """Fill worker buffer until some stopping criterion is satisfied"""
+        self.buffer.clear()
+        transitions_added = 0
+        state = self.env.reset()
+
+        while self.stopping_criterion():
+
+            transition, done = self.environment_step(state, action)
+
+            if self.num_step == 1:
+                self.buffer.append(transition)
+            
+            if self.num_steps > 1:
+                self.nstep_queue.append(transition)
+                if (len(self.nstep_queue) == self.num_steps) or done:
+                    self.buffer.append(transitions)
+
+            if done:
+                state = self.env.reset()
+                self.nstep_queue.clear()
+                self.write_log()
+
+    def get_buffer(self):
         """Return buffer"""
         return self.buffer
 
@@ -39,25 +72,3 @@ class Worker(ABC):
         for param, new_param in zip(self.brain.parameters(), new_params):
             new_param = torch.FloatTensor(new_param).to(self.device)
             param.data.copy_(new_param)
-    
-
-"""save for later:"""
-# def fill_buffer(self):
-#     transitions_added = 0
-#     state = self.env.reset()
-
-#     while transitions_added < self.max_worker_buffer_size:
-
-#         next_state, reward, done, = self.step()
-        
-#         if self.num_step == 1:
-#             transition = (state, action, reward, next_state, done)
-#             self.buffer.append(transition)
-
-#         if self.num_steps > 1:
-#             self.nstep_queue.append(state, action, reward, next_state, done)
-#             if len(self.nstep_queue) == self.num_steps:
-#                 transitions = organize_nstep(self.nstep_queue)
-#                 self.buffer.append(transitions)
-    
-
