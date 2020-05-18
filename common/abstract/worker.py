@@ -13,13 +13,13 @@ class Worker(ABC):
         self,
         worker_id: int,
         worker_brain: nn.Module,
-        env: gym.Env,
+        env_name: str,
         seed: int,
         cfg: dict,
     ):
         self.cfg
         self.brain = copy.deepcopy(worker_brain)
-        self.env = env
+        self.env = gym.make(env_name)
         self.env = env.seed(seed)
         self.buffer = deque()
         self.nstep_queue = deque()
