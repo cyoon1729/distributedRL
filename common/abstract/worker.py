@@ -17,12 +17,14 @@ class Worker(ABC):
         seed: int,
         cfg: dict,
     ):
-        self.cfg
+        self.cfg = cfg
+        self.device = torch.device(config['worker_device'])
         self.brain = copy.deepcopy(worker_brain)
         self.env = gym.make(env_name)
         self.env = env.seed(seed)
         self.buffer = deque()
         self.nstep_queue = deque()
+
 
     @abstractmethod
     def select_action(self, state: np.ndarray) -> np.ndarray:
@@ -31,7 +33,7 @@ class Worker(ABC):
     @abstractmethod
     def environment_step(
         self, state: np.ndarray, action: np.ndarray
-    ) -> Union[Tuple, bool]:
+    ) -> tuple:
         """Run one gym step"""
         pass
 
