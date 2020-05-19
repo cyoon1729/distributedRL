@@ -41,7 +41,7 @@ class ApeX(Architecture):
         )
 
     def train(self):
-        print("Pre-train check passed...")
+        print("Starting...")
 
         # pre-fill global buffer
         _, _ = ray.wait(
@@ -64,9 +64,9 @@ class ApeX(Architecture):
 
         update_step = 0
 
-        while update_step < self.num_train_steps:
+        while update_step < self.max_num_updates:
             # 1. Incoporate worker data into global buffer
-            ready_worker_list, _ = ray.wait(list(self.worker_buffers))
+            ready_worker_list, _ = ray.wait(list(worker_buffers))
             ready_worker_id = ready_worker_list[0]
             worker = worker_buffers.pop(ready_worker_id)
             self.global_buffer.incorporate_new_data.remote(
@@ -74,20 +74,24 @@ class ApeX(Architecture):
             )
 
             # 2. Sample from PER buffer
-            batch, indices, weights = ray.get(
-                self.global_buffer.sample.remote(self.batch_size, self.priority_beta)
+            batch = ray.get(
+                self.global_buffer.sample_data.remote(self.batch_size, self.priority_beta)
             )
 
             # 3. Run learner learning step
+            update_step  = update_step + 1
             step_info, idxes, new_priorities = ray.get(
-                self.learner.learning_step.remote(batch, indices, weights)
+                self.learner.learning_step.remote(batch)
             )
+
+            print(step_info)
 
             # 4. Update PER buffer priorities
             self.global_buffer.update_priorities.remote(idxes, new_priorities)
             self.priority_beta += self.priority_beta_increment
 
             # 5. Sync worker brain with new brain
-            new_params = ray.get(self.learner.get_params())
+            new_params = ray.get(self.learner.get_params.remote())
+            worker.synchronize.remote(new_params)
 
-            worker.set_params.remote(new_params)
+            worker_buffers[worker.collect_data.remote()] = worker
