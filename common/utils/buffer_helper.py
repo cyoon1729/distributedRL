@@ -9,7 +9,8 @@ class BufferHelper(object):
         self.buffer = buffer
 
     def incorporate_new_data(self, new_data: Deque):
-        self.buffer += new_data
+        for data in new_data:
+            self.buffer.add(*data)
 
-    def sample_data(self, batch_size: int):
-        return self.buffer.sample(batch_size)
+    def sample_data(self, batch_size: int, priority_beta):
+        return self.buffer.sample(batch_size, priority_beta)
