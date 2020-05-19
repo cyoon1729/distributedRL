@@ -9,23 +9,17 @@ from common.utils.param_server import ParameterServer
 
 
 class Architecture(ABC):
-    """Abstract Architecture used for all distributed architectures
-    
-    Attributes:
-        self.num_workers = 
-    
-    """
+    """Abstract Architecture used for all distributed architectures"""
 
     def __init__(self, cfg: dict):
         """Initialize"""
         self.cfg = cfg
-        self.env = self.cfg["env"]
         self.num_workers = self.cfg["num_workers"]
         self.num_learners = self.cfg["num_learners"]
-        self.num_step = self.cfg["num_step"]
 
     @abstractmethod
-    def spawn(self, worker: type, learner: type):
+    def spawn(self, worker: type, learner: type, global_buffer: BufferHelper):
+        """Spawn distributed components"""
         pass
 
     @abstractmethod
