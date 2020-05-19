@@ -14,3 +14,6 @@ class BufferHelper(object):
 
     def sample_data(self, batch_size: int, priority_beta):
         return self.buffer.sample(batch_size, priority_beta)
+    
+    def update_priorities(self, idxes, new_priorities):
+        self.buffer.update_priorities(idxes, new_priorities)

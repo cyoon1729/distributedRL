@@ -73,7 +73,7 @@ class ApeXWorker(Worker):
 
     def __init__(self, worker_id: int, worker_brain: nn.Module, seed: int, cfg: dict):
         super().__init__(worker_id, worker_brain, seed, cfg)
-        self.nstep_queue = deque()
+        self.nstep_queue = deque(maxlen=self.cfg["num_step"])
         self.worker_buffer_size = self.cfg["worker_buffer_size"]
         self.gamma = self.cfg["gamma"]
         self.num_step = self.cfg["num_step"]
