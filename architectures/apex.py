@@ -1,5 +1,5 @@
 import ray
-from typing import Union
+from typing import Union, Deque
 import torch.nn as nn
 
 from common.abstract.architecture import Architecture 
@@ -38,10 +38,9 @@ class ApeX(Architecture):
             for seed, worker_id in zip(self.worker_seeds, len(self.worker_seeds))
         ]
 
-        self.global_buffer = BufferHelper[
+        self.global_buffer = BufferHelper(
         	PrioritizedReplayBuffer(self.buffer_max_size)
-        ]
-
+		)
 
 	def train(self):
 		print("Pre-train check passed...")
