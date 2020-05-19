@@ -17,3 +17,4 @@ if __name__ == "__main__":
 
     ApeXDQN = ApeX(cfg)
     ApeXDQN.spawn(DQNWorker, DQNLearner, brain)
+    ApeXDQN.train()
