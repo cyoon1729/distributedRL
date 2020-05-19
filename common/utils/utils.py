@@ -1,7 +1,9 @@
-import numpy as np
 import gym
+import numpy as np
 import yaml
-from common.utils.baseline_wrappers import make_atari, wrap_deepmind, wrap_pytorch
+
+from common.utils.baseline_wrappers import (make_atari, wrap_deepmind,
+                                            wrap_pytorch)
 
 
 def read_config(config_path: str):
@@ -9,17 +11,28 @@ def read_config(config_path: str):
         cfg = yaml.load(ymlfile)
 
     if cfg["atari"] is True:
-        env = make_atari(cfg["env"])
+        env = make_atari(cfg["env_name"])
         env = wrap_deepmind(env)
         env = wrap_pytorch(env)
     else:
-        env = gym.make(cfg["env"])
+        env = gym.make(cfg["env_name"])
 
     cfg["obs_dim"] = env.observation_space.shape
     cfg["action_dim"] = env.action_space.n
     del env
 
     return cfg
+
+
+def create_env(env_name, atari):
+    if atari:
+        env = make_atari(env_name)
+        env = wrap_deepmind(env)
+        env = wrap_pytorch(env)
+    else:
+        env = gym.make(env_name)
+
+    return env
 
 
 def preprocess_nstep(transition_buffer, gamma=0.99):
