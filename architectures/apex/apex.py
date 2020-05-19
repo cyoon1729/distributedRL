@@ -73,13 +73,13 @@ class ApeX(Architecture):
 			)
 
 			# 2. Sample from PER buffer
-			batch, indices, weights = ray.get(
+			batch = ray.get(
 				self.global_buffer.sample.remote(self.batch_size, self.priority_beta)
 			)
 
 			# 3. Run learner learning step
 			step_info, indices, new_priorities = ray.get(
-				self.learner.learning_step.remote(batch, indices, weights)
+				self.learner.learning_step.remote(batch)
 			)
 
 			# 4. Update PER buffer priorities
