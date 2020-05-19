@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 from collections import deque
 from typing import Tuple, Union
-
+from copy import deepcopy
 import numpy as np
+import torch
 import torch.nn as nn
-
 import gym
+from common.utils.baseline_wrappers import make_atari, wrap_deepmind, wrap_pytorch
 
 
 class Worker(ABC):
@@ -18,13 +19,16 @@ class Worker(ABC):
         cfg: dict,
     ):
         self.cfg = cfg
-        self.device = torch.device(config['worker_device'])
-        self.brain = copy.deepcopy(worker_brain)
-        self.env = gym.make(env_name)
-        self.env = env.seed(seed)
+        self.device = torch.device(self.cfg['worker_device'])
+        self.brain = deepcopy(worker_brain)
+        if self.cfg['atari'] is True:
+            self.env = make_atari(env_name)
+            self.env = wrap_deepmind(self.env)
+            self.env = wrap_pytorch(self.env)
+        #self.env = self.env.seed(seed)
         self.buffer = deque()
-        self.nstep_queue = deque()
-
+        self.num_step = self.cfg['num_step']
+        self.nstep_queue = deque(maxlen=self.num_step)
 
     @abstractmethod
     def select_action(self, state: np.ndarray) -> np.ndarray:
@@ -45,29 +49,38 @@ class Worker(ABC):
     def stopping_criterion(self) -> bool:
         pass
 
+    @abstractmethod
+    def preprocess_data(self, data):
+        pass
+
     def collect_data(self):
         """Fill worker buffer until some stopping criterion is satisfied"""
         self.buffer.clear()
-        transitions_added = 0
         state = self.env.reset()
-
+ 
         while self.stopping_criterion():
-
-            transition, done = self.environment_step(state, action)
-
-            if self.num_step == 1:
-                self.buffer.append(transition)
-
-            if self.num_steps > 1:
-                self.nstep_queue.append(transition)
-                if (len(self.nstep_queue) == self.num_steps) or done:
-                    self.buffer.append(transitions)
-
-            if done:
-                state = self.env.reset()
-                self.nstep_queue.clear()
-                self.write_log()
-
+            done = False
+            while not done:
+                action = self.select_action(state)
+                transition = self.environment_step(state, action)
+                # self.env.render()
+                done = transition[-1]
+                next_state = transition[-2]
+        
+                if self.num_step == 1:
+                    self.buffer.append(transition)
+        
+                if self.num_step > 1:
+                    self.nstep_queue.append(transition)
+                    if (len(self.nstep_queue) == self.num_step) or done:
+                        nstep_data = self.preprocess_data(self.nstep_queue)
+                        self.buffer.append(nstep_data)
+                state = next_state
+        
+            state = self.env.reset()
+            self.nstep_queue.clear()
+            #self.write_log()
+   
     def get_buffer(self):
         """Return buffer"""
         return self.buffer
