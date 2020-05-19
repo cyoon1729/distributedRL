@@ -1,11 +1,12 @@
 # Environment parameters
 
-env: PongNoFrameskip-v4 #LunarLander-v2
+env_name: PongNoFrameskip-v4 #LunarLander-v2
 atari: True
 learner_device: cpu
 worker_device: cpu
 random_seed: 2019
-num_agents: 1
+num_workers: 1
+num_learners: 1
 
 # Training parameters
 model: Apex-DQN
