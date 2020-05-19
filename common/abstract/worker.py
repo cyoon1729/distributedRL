@@ -5,6 +5,7 @@ from typing import Deque
 
 import numpy as np
 import torch
+import torch.nn as nn
 
 from common.utils.utils import create_env
 
@@ -18,7 +19,7 @@ class Worker(ABC):
         self.device = torch.device(self.cfg["worker_device"])
         self.brain = deepcopy(worker_brain)
         self.buffer = deque()
-        self.env = create_env(self.cfg["env_name"])
+        self.env = create_env(self.cfg["env_name"], self.cfg["atari"])
         self.seed = seed
 
     @abstractmethod
@@ -51,6 +52,11 @@ class Worker(ABC):
         """Run environment and collect data until stopping criterion satisfied"""
         pass
 
+    @abstractmethod
+    def test_run(self):
+        """Specifically for the performance-testing worker"""
+        pass
+
     def get_buffer(self):
         """Return buffer"""
         return self.buffer
@@ -70,9 +76,7 @@ class ApeXWorker(Worker):
         self.nstep_queue = deque()
         self.worker_buffer_size = self.cfg["worker_buffer_size"]
         self.gamma = self.cfg["gamma"]
-
-    def stopping_criterion(self) -> bool:
-        return len(self.buffer) < self.worker_buffer_size
+        self.num_step = self.cfg["num_step"]
 
     def preprocess_data(self, nstepqueue: Deque) -> tuple:
         discounted_reward = 0
@@ -93,6 +97,7 @@ class ApeXWorker(Worker):
             while not done:
                 action = self.select_action(state)
                 transition = self.environment_step(state, action)
+                next_state = transition[-2]
                 done = transition[-1]
 
                 self.nstep_queue.append(transition)
