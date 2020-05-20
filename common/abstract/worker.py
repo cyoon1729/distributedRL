@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from copy import deepcopy
 from typing import Deque
+import datetime as datetime
 
 import numpy as np
 import torch
@@ -20,7 +21,7 @@ class Worker(ABC):
         self.brain = deepcopy(worker_brain)
         self.buffer = deque()
         self.env = create_env(self.cfg["env_name"], self.cfg["atari"])
-        self.seed = seed
+        self.env.seed(seed)
 
     @abstractmethod
     def select_action(self, state: np.ndarray) -> np.ndarray:
@@ -68,6 +69,7 @@ class Worker(ABC):
             param.data.copy_(new_param)
 
 
+
 class ApeXWorker(Worker):
     """Abstract class for ApeX distrbuted workers """
 
@@ -93,12 +95,15 @@ class ApeXWorker(Worker):
         state = self.env.reset()
 
         while self.stopping_criterion():
+            episode_reward = 0
             done = False
             while not done:
                 action = self.select_action(state)
                 transition = self.environment_step(state, action)
                 next_state = transition[-2]
                 done = transition[-1]
+                reward = transition[-3]
+                episode_reward += reward
 
                 self.nstep_queue.append(transition)
                 if (len(self.nstep_queue) == self.num_step) or done:
@@ -106,6 +111,6 @@ class ApeXWorker(Worker):
                     self.buffer.append(nstep_data)
 
                 state = next_state
-
+            # print(f"Worker {self.worker_id}: {episode_reward}")
             state = self.env.reset()
             self.nstep_queue.clear()

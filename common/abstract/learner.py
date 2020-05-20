@@ -34,7 +34,7 @@ class Learner(ABC):
 
     def params_to_numpy(self, model):
         params = []
-        state_dict = model.state_dict()
+        state_dict = model.cpu().state_dict()
         for param in list(state_dict):
             params.append(state_dict[param])
         return params
