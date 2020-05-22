@@ -4,32 +4,43 @@ from copy import deepcopy
 from typing import Deque
 import datetime as datetime
 
+import zmq
+import pyarrow as pa
 import numpy as np
 import torch
 import torch.nn as nn
-
+import random
 from common.utils.utils import create_env
 
 
 class Worker(ABC):
     def __init__(
-        self, worker_id: int, worker_brain: nn.Module, seed: int, cfg: dict,
+        self, worker_brain: nn.Module, worker_id: int, worker_cfg: dict, comm_cfg: dict
     ):
-        self.cfg = cfg
         self.worker_id = worker_id
-        self.device = torch.device(self.cfg["worker_device"])
-        self.brain = deepcopy(worker_brain)
-        self.buffer = deque()
+        self.cfg = worker_cfg
+        self.devuce = worker_cfg["worker_device"]
+        self.brain = deepcopy(worker_brain).to(self.device)
+        
+        # create env
+        random.seed(self.worker_id)
         self.env = create_env(self.cfg["env_name"], self.cfg["atari"])
-        self.env.seed(seed)
+        self.seed = random.randin(1, 999)
+        self.env.seed(self.seed)
+
+        # unpack communication configs
+        self.pubsub_port = comm_cfg["pubsub_port"]
+        self.pullpush_port = comm_cfg["pullpush_port"]
+
+        # initialize zmq sockets
+        print(f"[Worker: {self.worker_id}]: initializing sockets..")
+        self.initialize_sockets()
 
     @abstractmethod
     def select_action(self, state: np.ndarray) -> np.ndarray:
         """Select action with worker's brain"""
-        pass
-
-    @abstractmethod
-    def environment_step(self, state: np.ndarray, action: np.ndarray) -> tuple:
+        pass    def send_replay_data(self):
+            ray, action: np.ndarray) -> tuple:
         """Run one gym env step"""
         pass
 
@@ -39,17 +50,12 @@ class Worker(ABC):
         pass
 
     @abstractmethod
-    def stopping_criterion(self) -> bool:
-        """Stopping criterion for collect_data()"""
-        pass
-
-    @abstractmethod
-    def preprocess_data(self, data):
+    def preprocess_data(self, data) -> list:
         """Preprocess collected data if necessary (e.g. n-step)"""
         pass
 
     @abstractmethod
-    def collect_data(self):
+    def collect_data(self) -> list:
         """Run environment and collect data until stopping criterion satisfied"""
         pass
 
@@ -58,27 +64,52 @@ class Worker(ABC):
         """Specifically for the performance-testing worker"""
         pass
 
-    def get_buffer(self):
-        """Return buffer"""
-        return self.buffer
-
     def synchronize(self, new_params: list):
         """Synchronize worker brain with parameter server"""
         for param, new_param in zip(self.brain.parameters(), new_params):
             new_param = torch.FloatTensor(new_param).to(self.device)
             param.data.copy_(new_param)
 
+    def initialize_sockets(self):
+        # for receiving params from learner
+        context = zmq.Context()
+        self.sub_socket = context.socket(zmq.SUB)
+        self.sub_socket.connect(f"tcp://127.0.0.1:{self.pubsub_port}")
 
+        # for sending replay data to buffer: MOVE THIS TO WORKER SET?
+        context = zmq.Context()
+        self.push_socket = context.socket(zmq.PUSH)
+        self.push_socket.bind(f"tcp://127.0.0.1:{self.pullpush_port}")
+    
+    def send_replay_data(self, replay_data):
+        replay_data_id = pa.serialize(replay_data).to_buffer()
+        self.push_socket.send(replay_data)
+    
+    def receive_new_params(self):
+        new_params_id = self.sub_socket.recv()
+        if new_params_id:
+            new_params = pa.deserialize(new_params_id)
+            self.synchronize(new_params)
+        else:
+            pass
+    
+    def run(self):
+        while True:
+            local_buffer = self.collect_data()
+            self.send_replay_data(local_buffer)
+            self.receive_new_params()
+            
 
 class ApeXWorker(Worker):
     """Abstract class for ApeX distrbuted workers """
 
-    def __init__(self, worker_id: int, worker_brain: nn.Module, seed: int, cfg: dict):
-        super().__init__(worker_id, worker_brain, seed, cfg)
+    def __init__(self, worker_id: int, worker_brain: nn.Module, cfg: dict):
+        super().__init__(worker_id, worker_brain, cfg)
         self.nstep_queue = deque(maxlen=self.cfg["num_step"])
         self.worker_buffer_size = self.cfg["worker_buffer_size"]
         self.gamma = self.cfg["gamma"]
         self.num_step = self.cfg["num_step"]
+        # print(f"worker params: {next(self.brain.parameters()).is_cuda}")
 
     def preprocess_data(self, nstepqueue: Deque) -> tuple:
         discounted_reward = 0
@@ -89,14 +120,18 @@ class ApeXWorker(Worker):
         nstep_data = (state, action, discounted_reward, last_state, done)
         return nstep_data
 
-    def collect_data(self):
-        """Fill worker buffer until some stopping criterion is satisfied"""
-        self.buffer.clear()
-        state = self.env.reset()
+    def compute_priorities(self):
+        pass
 
-        while self.stopping_criterion():
+    def collect_data(self, verbose=False):
+        """Fill worker buffer until some stopping criterion is satisfied"""
+        local_buffer = []
+        nstep_queue = deque(maxlen=self.num_step)
+
+        while len(local_buffer) < self.worker_buffer_size:
             episode_reward = 0
             done = False
+            
             while not done:
                 action = self.select_action(state)
                 transition = self.environment_step(state, action)
@@ -105,12 +140,15 @@ class ApeXWorker(Worker):
                 reward = transition[-3]
                 episode_reward += reward
 
-                self.nstep_queue.append(transition)
-                if (len(self.nstep_queue) == self.num_step) or done:
-                    nstep_data = self.preprocess_data(self.nstep_queue)
-                    self.buffer.append(nstep_data)
+                nstep_queue.append(transition)
+                if (len(nstep_queue) == self.num_step) or done:
+                    nstep_data = self.preprocess_data(nstep_queue)
+                    buffer.append(nstep_data)
 
                 state = next_state
-            # print(f"Worker {self.worker_id}: {episode_reward}")
-            state = self.env.reset()
-            self.nstep_queue.clear()
+
+            if verbose:
+                if episode_reward > 0:
+                    print(f"Worker {self.worker_id}: {episode_reward}")
+            
+        return local_buffer

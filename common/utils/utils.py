@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 import yaml
-
+import torch 
 from common.utils.baseline_wrappers import (make_atari, wrap_deepmind,
                                             wrap_pytorch)
 
@@ -53,3 +53,10 @@ def preprocess_nstep(transition_buffer, gamma=0.99):
         np.array(last_state),
         np.array(done),
     )
+
+def params_to_numpy(model):
+    params = []
+    state_dict = model.cpu().state_dict()
+    for param in list(state_dict):
+        params.append(state_dict[param])
+    return params

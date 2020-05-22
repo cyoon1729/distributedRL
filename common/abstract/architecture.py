@@ -17,10 +17,10 @@ class Architecture(ABC):
         self.num_workers = self.cfg["num_workers"]
         self.num_learners = self.cfg["num_learners"]
 
-    @abstractmethod
-    def spawn(self, worker: type, learner: type, global_buffer: BufferHelper):
-        """Spawn distributed components"""
-        pass
+    # @abstractmethod
+    # def spawn(self, worker: type, learner: type, global_buffer: BufferHelper):
+    #     """Spawn distributed components"""
+    #     pass
 
     @abstractmethod
     def train(self):
