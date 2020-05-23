@@ -23,7 +23,7 @@ class Learner(ABC):
         pass
 
     @abstractmethod
-    def get_params(self):
+    def get_params(self) -> np.ndarray:
         """Return model params for synchronization"""
         pass
 

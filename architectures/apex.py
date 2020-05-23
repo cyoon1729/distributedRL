@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import random
 from datetime import datetime
+import asyncio 
 
 from common.abstract.architecture import Architecture
 from common.utils.buffer import PrioritizedReplayBuffer
@@ -13,56 +14,59 @@ from common.utils.buffer_helper import BufferHelper
 from common.utils.param_server import ParameterServer
 
 
-# @ray.remote
-# def run_workers(worker_buffers, param_server, global_buffer):
-#     # 1. Incoporate worker data into global buffer
-#     while True:
-#         ready_worker_list, _ = ray.wait(list(worker_buffers))   # <-- lock (fix)
-#         ready_worker_id = ready_worker_list[0]
-#         worker = worker_buffers.pop(ready_worker_id)
-#         global_buffer.incorporate_new_data.remote(
-#             ray.get(worker.get_buffer.remote())
-#         )
-#         new_params = param_server.get_params.remote()
-#         worker.synchronize.remote(new_params)
+@ray.remote
+def run_learner(learner, global_buffer_handle, param_server_handle, batch_size, synchronize_interval, max_num_updates):
+    print("starting learner")
+    update_step = 0
+    while update_step < max_num_updates:
+        if learner.batch_queue:
+        	batch = learner.batch_queue.pop()
+        	step_info, idxes, new_priorities = learner.learning_step(batch)
+        	global_buffer_handle.update_priorities.remote(idxes, new_priorities)
+        	priority_beta = priority_beta + priority_beta_increment
+        	update_step = update_step + 1
 
-#         worker_buffers[worker.collect_data.remote()] = worker
+		if update_step % synchronize_interval == 0:
+        	new_params = learner.get_params()
+        	param_server_handle.recv_new_params(new_params)
 
-# @ray.remote(num_gpus=1)
-# def run_learner(learner, global_buffer, param_server, priority_beta, priority_beta_increment, batch_size=64):
-#     while True:
-#         # 2. Sample from PER buffer
-#         print("whuuuut")
-#         batch = ray.get(
-#             global_buffer.sample_data.remote(batch_size, priority_beta)
-#         )
 
-#         # 3. Run learner learning step
-#         step_info, idxes, new_priorities = ray.get(
-#             learner.learning_step.remote(batch)
-#         )
+@ray.remote
+def run_worker(worker, global_buffer_handle, param_server_handle, worker_update_interval):
+	# if worker is not ray.remote actor, then how to receive
+	# param_server_handle without calling ray.get()?
 
-#         # print(step_info)
+	worker_buffer = worker.collect_data()
+	global_buffer_handle.recv_new_data.remote(worker_buffer)
+        
 
-#         # 4. Update PER buffer priorities
-#         global_buffer.update_priorities.remote(idxes, new_priorities)
-#         priority_beta += priority_beta_increment
 
-#         # 5. Sync worker brain with new brain
-#         new_params = ray.get(learner.get_params.remote())
-#         param_server.update_params.remote(new_params)    
-#         ray.get(param_server.get_update_step.remote())
 
-# @ray.remote
-# def run_interim_test(performance_worker, param_server):
-#     while True:
-#         update_step = ray.get(param_server.get_update_step.remote())
-#         # print(update_step)
-#         if update_step % 10 == 0:
-#             new_params = ray.get(param_server.get_params.remote())
-#             performance_worker.synchronize.remote(new_params)
-#             episode_reward = ray.get(performance_worker.test_run.remote())
 
+@ray.remote
+async def run_workers(workers, global_buffer_handle, learner_handle, worker_update_interval):
+	print("starting worker")
+    worker_buffers = {}
+    worker_update_steps = {}
+    for worker in workers:
+        worker_buffers[worker.collect_data.remote()] = worker
+        worker_update_steps[worker] = 0
+
+    while True:
+        ready_worker_list, _ = ray.wait(list(worker_buffers)) # -> NOTE: not allowed
+        ready_worker_id = ready_worker_list[0]
+        worker = worker_buffers.pop(ready_worker_id)
+        
+        global_buffer_handle.incorporate_new_data.remote(
+        	ray.get(worker.get_buffer.remote()) # -> NOTE: not allowed
+        )
+
+       	if worker_update_steps[worker] % worker_update_interval == 0:
+        	new_params = ray.get(self.param_server.get_params.remote())
+        	worker.synchronize.remote(new_params)
+        	worker_update_steps[worker] = worker_update_steps[worker] + 1
+        
+        worker_buffers[worker.collect_data.remote()] = worker
 
 
 class ApeX(Architecture):

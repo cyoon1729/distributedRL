@@ -76,7 +76,8 @@ class ApeXWorker(Worker):
     def __init__(self, worker_id: int, worker_brain: nn.Module, seed: int, cfg: dict):
         super().__init__(worker_id, worker_brain, seed, cfg)
         self.nstep_queue = deque(maxlen=self.cfg["num_step"])
-        self.worker_buffer_size = self.cfg["worker_buffer_size"]
+        self.local_buffer = []
+        self.local_buffer_size = self.cfg["worker_buffer_size"]
         self.gamma = self.cfg["gamma"]
         self.num_step = self.cfg["num_step"]
 
@@ -91,7 +92,9 @@ class ApeXWorker(Worker):
 
     def collect_data(self):
         """Fill worker buffer until some stopping criterion is satisfied"""
-        self.buffer.clear()
+        self.local_buffer = []
+        self.nstep_queue.clear()
+
         state = self.env.reset()
 
         while self.stopping_criterion():
@@ -108,9 +111,8 @@ class ApeXWorker(Worker):
                 self.nstep_queue.append(transition)
                 if (len(self.nstep_queue) == self.num_step) or done:
                     nstep_data = self.preprocess_data(self.nstep_queue)
-                    self.buffer.append(nstep_data)
+                    self.local_buffer.append(nstep_data)
 
                 state = next_state
             # print(f"Worker {self.worker_id}: {episode_reward}")
             state = self.env.reset()
-            self.nstep_queue.clear()
