@@ -27,4 +27,5 @@ class ParameterServer(object):
 
     async def recv_params(self, new_params):
         self.update_params(new_params)
+        # now distribute params
         

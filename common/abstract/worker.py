@@ -22,6 +22,7 @@ class Worker(ABC):
         self.buffer = deque()
         self.env = create_env(self.cfg["env_name"], self.cfg["atari"])
         self.env.seed(seed)
+        self.param_queue = deque(maxlen=1)
 
     @abstractmethod
     def select_action(self, state: np.ndarray) -> np.ndarray:
@@ -39,17 +40,7 @@ class Worker(ABC):
         pass
 
     @abstractmethod
-    def stopping_criterion(self) -> bool:
-        """Stopping criterion for collect_data()"""
-        pass
-
-    @abstractmethod
-    def preprocess_data(self, data):
-        """Preprocess collected data if necessary (e.g. n-step)"""
-        pass
-
-    @abstractmethod
-    def collect_data(self):
+    def collect_data(self) -> list:
         """Run environment and collect data until stopping criterion satisfied"""
         pass
 
@@ -58,16 +49,20 @@ class Worker(ABC):
         """Specifically for the performance-testing worker"""
         pass
 
-    def get_buffer(self):
-        """Return buffer"""
-        return self.buffer
+    @abstractmethod
+    def run(self):
+        """Run main loop """
+        pass
 
-    def synchronize(self, new_params: list):
+    async def recv_params(self, new_params):
+        """This function is called from the learner class"""
+        self.param_queue.append(new_params)
+
+    def update_params(self, new_params: list):
         """Synchronize worker brain with parameter server"""
         for param, new_param in zip(self.brain.parameters(), new_params):
             new_param = torch.FloatTensor(new_param).to(self.device)
             param.data.copy_(new_param)
-
 
 
 class ApeXWorker(Worker):
@@ -77,7 +72,7 @@ class ApeXWorker(Worker):
         super().__init__(worker_id, worker_brain, seed, cfg)
         self.nstep_queue = deque(maxlen=self.cfg["num_step"])
         self.local_buffer = []
-        self.local_buffer_size = self.cfg["worker_buffer_size"]
+        self.max_local_buffer_size = self.cfg["worker_buffer_size"]
         self.gamma = self.cfg["gamma"]
         self.num_step = self.cfg["num_step"]
 
@@ -88,16 +83,32 @@ class ApeXWorker(Worker):
             state, action, reward, _, _ = transition
             discounted_reward = reward + self.gamma * discounted_reward
         nstep_data = (state, action, discounted_reward, last_state, done)
-        return nstep_data
+
+        q_value = self.brain.forward(
+            torch.FloatTensor(state).unsqueeze(0).to(self.device),
+            torch.FloatTensor(action).unsqueeze(0).to(self.device)
+        )
+
+        bootstrap_q = torch.max(
+            self.brain.forward(
+                torch.FloatTensor(last_state).unsqueeze(0).to(self.device)
+            ),
+            1
+        )[0]
+
+        target_q_value = discounted_reward + self.gamma**self.num_step * bootstrap_q
+        priority_value = torch.abs(target_q_value - q_value).detach().view(-1)
+        priority_value = priority_value.cpu().numpy().tolist()
+        
+        return nstep_data, priority_value
 
     def collect_data(self):
         """Fill worker buffer until some stopping criterion is satisfied"""
-        self.local_buffer = []
-        self.nstep_queue.clear()
+        local_buffer = []
+        nstep_queue = deque(maxlen=self.num_step)
 
         state = self.env.reset()
-
-        while self.stopping_criterion():
+        while len(local_buffer) < self.max_local_buffer_size:
             episode_reward = 0
             done = False
             while not done:
@@ -108,11 +119,21 @@ class ApeXWorker(Worker):
                 reward = transition[-3]
                 episode_reward += reward
 
-                self.nstep_queue.append(transition)
-                if (len(self.nstep_queue) == self.num_step) or done:
-                    nstep_data = self.preprocess_data(self.nstep_queue)
-                    self.local_buffer.append(nstep_data)
+                nstep_queue.append(transition)
+                if (len(nstep_queue) == num_step) or done:
+                    replay_data = self.preprocess_data(step_queue)
+                    local_buffer.append(replay_data)
 
                 state = next_state
             # print(f"Worker {self.worker_id}: {episode_reward}")
             state = self.env.reset()
+
+        return local_buffer 
+
+    async def run(self, global_buffer_handle):
+        while True:
+            local_buffer = self.collect_data()
+            global_buffer_handle.recv_new_data(local_buffer)
+            if self.param_queue:
+                new_params = self.param_queue.pop()
+                self.update_params(new_params)
