@@ -1,5 +1,5 @@
 # Distributed Reinforcement Learning 
-#### Undergoing refactoring! I am currently refactoring this repository to enable more structural and modular implementations of distributed frameworks. New updates are coming soon!
+#### Undergoing refactoring! I am currently refactoring this repository to enable more structural and modular implementations of distributed frameworks. New updates are coming soon!. In [refactoring-2] I am using only ray, and in [using_zmq] I am using ray and zeromq. 
 
 Single-machine implementations of distributed reinforcement learning algorithms with [*Ray*](https://github.com/ray-project/ray) and PyTorch. See below for a quick, extremely simple demo of Ray. Also see below for general notes on implementations.
 
