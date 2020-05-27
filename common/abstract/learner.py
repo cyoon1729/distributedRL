@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Union
@@ -14,6 +15,7 @@ class Learner(ABC):
         self, brain: Union[nn.Module, tuple], learner_cfg: dict, comm_cfg: dict
     ):
         self.cfg = learner_cfg
+        self.device = self.cfg["learner_device"]
         self.brain = deepcopy(brain)
 
         # unpack communication configs

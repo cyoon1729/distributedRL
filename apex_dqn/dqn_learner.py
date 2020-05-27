@@ -12,6 +12,7 @@ class DQNLearner(Learner):
     def __init__(self, brain, cfg: dict, comm_config: dict):
         super().__init__(brain, cfg, comm_config)
         self.num_step = self.cfg["num_step"]
+        self.gamma = self.cfg["gamma"]
         self.tau = self.cfg["tau"]
         self.network = self.brain[0]
         self.network.to(self.device)
