@@ -1,8 +1,10 @@
 import random
-import numpy as np
 from collections import deque
 
-from common.utils.segtree import SegmentTree, MinSegmentTree, SumSegmentTree
+import numpy as np
+
+from common.utils.segtree import MinSegmentTree, SegmentTree, SumSegmentTree
+
 
 class ReplayBuffer(object):
     def __init__(self, size):
@@ -39,7 +41,13 @@ class ReplayBuffer(object):
             rewards.append(reward)
             obses_tp1.append(np.array(obs_tp1, copy=False))
             dones.append(done)
-        return np.array(obses_t), np.array(actions), np.array(rewards), np.array(obses_tp1), np.array(dones)
+        return (
+            np.array(obses_t),
+            np.array(actions),
+            np.array(rewards),
+            np.array(obses_tp1),
+            np.array(dones),
+        )
 
     def sample(self, batch_size):
         """Sample a batch of experiences.

@@ -1,15 +1,17 @@
 from typing import Deque
 
+import pyarrow as pa
 import ray
 import zmq
-import pyarrow as pa
+
+from common.utils.buffer import PrioritizedReplayBuffer
+
 
 @ray.remote
 class PrioritizedReplayBufferHelper(object):
-    def __init__(self, buffer, buffer_cfg: dict, comm_cfg: dict):
-        self.buffer = buffer
+    def __init__(self, buffer_cfg: dict, comm_cfg: dict):
         self.cfg = buffer_cfg
-        
+
         # unpack buffer configs
         self.max_num_updates = self.cfg["max_num_updates"]
         self.priority_alpha = self.cfg["priority_alpha"]
@@ -20,6 +22,10 @@ class PrioritizedReplayBufferHelper(object):
         ) / self.max_num_updates
 
         self.batch_size = self.cfg["batch_size"]
+
+        self.buffer = PrioritizedReplayBuffer(
+            self.cfg["buffer_max_size"], self.priority_alpha
+        )
 
         # unpack communication configs
         self.repreq_port = comm_cfg["repreq_port"]
@@ -38,32 +44,35 @@ class PrioritizedReplayBufferHelper(object):
         # for receiving replay data from workers
         context = zmq.Context()
         self.pull_socket = context.socket(zmq.PULL)
-        self.pull_socket.connect(f"tcp://127.0.0.1:{self.pullpush_port}")
-    
-    def send_batch_recv_priors(self)
+        self.pull_socket.bind(f"tcp://127.0.0.1:{self.pullpush_port}")
+
+    def send_batch_recv_priors(self):
         # send batch and request priorities (blocking recv)
         batch = self.buffer.sample(self.batch_size, self.priority_beta)
         batch_id = pa.serialize(batch).to_buffer()
-        self.rep_socket.send(batch_id) 
+        self.rep_socket.send(batch_id)
 
-        # receive and update priorities 
+        # receive and update priorities
         new_priors_id = self.rep_socket.recv()
         idxes, new_priorities = pa.deserialize(new_priors_id)
         self.buffer.update_priorities(idxes, new_priorities)
-    
+
     def recv_data(self):
-        new_replay_data_id = self.pull_socket.recv()
+        new_replay_data_id = False
+        try:
+            new_replay_data_id = self.pull_socket.recv(zmq.DONTWAIT)
+        except zmq.Again:
+            pass
+
         if new_replay_data_id:
             new_replay_data = pa.deserialize(new_replay_data_id)
             for data in new_replay_data:
                 self.buffer.add(*data)
-        else:
-            pass
-    
+
     def run(self):
         while True:
             self.recv_data()
-            if len(self.buffer) > self.batch_size
-                self.send_batch_recv_priors()    
+            if len(self.buffer) > self.batch_size:
+                self.send_batch_recv_priors()
             else:
                 pass

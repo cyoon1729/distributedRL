@@ -1,7 +1,11 @@
+from typing import Deque, Union
+
 import gym
 import numpy as np
+import torch
 import yaml
-import torch 
+from gym.wrappers import TimeLimit
+
 from common.utils.baseline_wrappers import (make_atari, wrap_deepmind,
                                             wrap_pytorch)
 
@@ -16,15 +20,20 @@ def read_config(config_path: str):
         env = wrap_pytorch(env)
     else:
         env = gym.make(cfg["env_name"])
+    del env
 
     cfg["obs_dim"] = env.observation_space.shape
     cfg["action_dim"] = env.action_space.n
-    del env
 
-    return cfg
+    comm_cfg = {}
+    comm_cfg["pubsub_port"] = cfg["pubsub_port"]
+    comm_cfg["repreq_port"] = cfg["repreq_port"]
+    comm_cfg["pullpush_port"] = cfg["pullpush_port"]
+
+    return cfg, comm_cfg
 
 
-def create_env(env_name, atari):
+def create_env(env_name: str, atari: bool, max_episode_steps: Union[int, None]):
     if atari:
         env = make_atari(env_name)
         env = wrap_deepmind(env)
@@ -32,10 +41,13 @@ def create_env(env_name, atari):
     else:
         env = gym.make(env_name)
 
+    if max_episode_steps:
+        env = TimeLimit(env, max_episode_steps=1000)
+
     return env
 
 
-def preprocess_nstep(transition_buffer, gamma=0.99):
+def preprocess_nstep(transition_buffer: Deque, gamma=0.99):
     transition_buffer = list(transition_buffer)
     discounted_reward = 0
     for transition in reversed(transition_buffer[:-1]):
@@ -53,6 +65,7 @@ def preprocess_nstep(transition_buffer, gamma=0.99):
         np.array(last_state),
         np.array(done),
     )
+
 
 def params_to_numpy(model):
     params = []
