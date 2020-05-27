@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Union
+from collections import deque
 
 import asyncio
 import numpy as np
@@ -48,8 +49,8 @@ class ApeXLearner(Learner):
     def __init__(self, brain: Union[nn.Module, tuple], cfg: dict):
         super().__init__(brain, cfg)
         self.max_num_updates = cfg["max_num_updates"]
-        self.buffer_max_size = cfg["buffer_max_size"]
-        self.batch_queue = deque(maxlen=10) # redefine maxlen
+        self.synchronize_interval = cfg["synchronize_interval"]
+        self.batch_queue = deque(maxlen=10)
 
     async def run(self, global_buffer_handle, workers):
         print("starting learner")
@@ -58,10 +59,11 @@ class ApeXLearner(Learner):
             if self.batch_queue:
                 batch = self.batch_queue.pop()
                 step_info, idxes, new_priorities = self.learning_step(batch)
+                print(step_info)
                 global_buffer_handle.update_priorities.remote(idxes, new_priorities)
                 update_step = update_step + 1
 
             if update_step % self.synchronize_interval == 0:
                 new_params = self.get_params()
                 for worker_handle in workers:
-                    worker_handle.recv_params(new_params)
+                    worker_handle.recv_params.remote(new_params)

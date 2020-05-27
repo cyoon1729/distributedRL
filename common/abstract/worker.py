@@ -84,10 +84,7 @@ class ApeXWorker(Worker):
             discounted_reward = reward + self.gamma * discounted_reward
         nstep_data = (state, action, discounted_reward, last_state, done)
 
-        q_value = self.brain.forward(
-            torch.FloatTensor(state).unsqueeze(0).to(self.device),
-            torch.FloatTensor(action).unsqueeze(0).to(self.device)
-        )
+        q_value = self.brain.forward(torch.FloatTensor(state).unsqueeze(0).to(self.device))[0][action]
 
         bootstrap_q = torch.max(
             self.brain.forward(
@@ -120,12 +117,12 @@ class ApeXWorker(Worker):
                 episode_reward += reward
 
                 nstep_queue.append(transition)
-                if (len(nstep_queue) == num_step) or done:
-                    replay_data = self.preprocess_data(step_queue)
+                if (len(nstep_queue) == self.num_step) or done:
+                    replay_data = self.preprocess_data(nstep_queue)
                     local_buffer.append(replay_data)
 
                 state = next_state
-            # print(f"Worker {self.worker_id}: {episode_reward}")
+            print(f"Worker {self.worker_id}: {episode_reward}")
             state = self.env.reset()
 
         return local_buffer 
@@ -133,7 +130,7 @@ class ApeXWorker(Worker):
     async def run(self, global_buffer_handle):
         while True:
             local_buffer = self.collect_data()
-            global_buffer_handle.recv_new_data(local_buffer)
+            global_buffer_handle.recv_new_data.remote(local_buffer)
             if self.param_queue:
                 new_params = self.param_queue.pop()
                 self.update_params(new_params)
