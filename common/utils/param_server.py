@@ -20,6 +20,6 @@ class ParameterServer(object):
 
     def get_params(self):
         return self.params
-    
+
     def get_update_step(self):
         return self.update_step

@@ -1,0 +1,33 @@
+# Environment parameters
+env_name: PongNoFrameskip-v4 #   CartPole-v1 # LunarLander-v2 #  
+atari: True
+
+# Learning parameters
+model: Apex-DQN
+learner_device: cuda
+worker_device: cpu
+num_workers: 8
+num_learners: 1
+num_step: 3
+batch_size: 512
+param_update_interval: 10
+max_num_updates: 100000 
+tau: 0.01
+learning_rate: 0.003
+gamma: 0.99
+eps_greedy: 0.20
+eps_decay: 0.99
+
+# Buffer parameters
+buffer_max_size: 500000 
+use_per: True  
+priority_alpha: 0.6
+priority_beta: 0.4
+priority_beta_start: 0.4 
+priority_beta_end: 1.0 
+worker_buffer_size: 1000
+
+# Communication configs
+pubsub_port: 5555
+repreq_port: 5556
+pullpush_port: 5557
