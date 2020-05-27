@@ -19,24 +19,24 @@ class ApeX(Architecture):
     ):
         self.cfg = cfg
         self.comm_cfg = comm_cfg
-        super().__init__(self.cfg)
+        super().__init__(worker_cls, learner_cls, self.cfg)
 
         self.brain = brain
         if type(brain) is tuple:
-            worker_brain = self.brain[0]
+            self.worker_brain = self.brain[0]
         else:
-            worker_brain = self.brain
+            self.worker_brain = self.brain
 
     def spawn(self):
         # Spawn all components
         self.workers = [
-            worker_cls.remote(n, worker_brain, self.cfg, self.comm_cfg)
+            self.worker_cls.remote(n, self.worker_brain, self.cfg, self.comm_cfg)
             for n in range(1, self.num_workers + 1)
         ]
-        self.performance_worker = worker_cls.remote(
-            "Test", worker_brain, self.cfg, self.comm_cfg
+        self.performance_worker = self.worker_cls.remote(
+            "Test", self.worker_brain, self.cfg, self.comm_cfg
         )
-        self.learner = learner_cls.remote(self.brain, self.cfg, self.comm_cfg)
+        self.learner = self.learner_cls.remote(self.brain, self.cfg, self.comm_cfg)
         self.global_buffer = PrioritizedReplayBufferHelper.remote(
             self.cfg, self.comm_cfg
         )

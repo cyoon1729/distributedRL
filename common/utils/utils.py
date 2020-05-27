@@ -20,10 +20,10 @@ def read_config(config_path: str):
         env = wrap_pytorch(env)
     else:
         env = gym.make(cfg["env_name"])
-    del env
 
     cfg["obs_dim"] = env.observation_space.shape
     cfg["action_dim"] = env.action_space.n
+    del env
 
     comm_cfg = {}
     comm_cfg["pubsub_port"] = cfg["pubsub_port"]

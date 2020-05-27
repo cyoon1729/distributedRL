@@ -3,8 +3,8 @@ import torch
 
 from apex_dqn.dqn_learner import DQNLearner
 from apex_dqn.dqn_worker import DQNWorker
-from apex_dqn.models import ConvDQN, ConvDuelingDQN, DuelingDQN
-from architectures.apex_zmq import ApeX
+from apex_dqn.models import ConvDQN, ConvDuelingDQN
+from architectures.apex import ApeX
 from common.utils.buffer_helper import PrioritizedReplayBufferHelper
 from common.utils.utils import read_config
 
@@ -20,4 +20,5 @@ if __name__ == "__main__":
     brain = (dqn, target_dqn)
 
     ApeXDQN = ApeX(DQNWorker, DQNLearner, brain, cfg, comm_cfg)
+    ApeXDQN.spawn()
     ApeXDQN.train()

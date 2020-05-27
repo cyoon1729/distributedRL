@@ -28,7 +28,9 @@ class Worker(ABC):
 
         # create env
         random.seed(self.worker_id)
-        self.env = create_env(self.cfg["env_name"], self.cfg["atari"])
+        self.env = create_env(
+            self.cfg["env_name"], self.cfg["atari"], self.cfg["max_episode_steps"]
+        )
         self.seed = random.randint(1, 999)
         self.env.seed(self.seed)
 
@@ -127,7 +129,25 @@ class ApeXWorker(Worker):
             state, action, reward, _, _ = transition
             discounted_reward = reward + self.gamma * discounted_reward
         nstep_data = (state, action, discounted_reward, last_state, done)
-        return nstep_data
+
+        q_value = self.brain.forward(
+            torch.FloatTensor(state).unsqueeze(0).to(self.device)
+        )[0][action]
+
+        bootstrap_q = torch.max(
+            self.brain.forward(
+                torch.FloatTensor(last_state).unsqueeze(0).to(self.device)
+            ),
+            1,
+        )
+
+        target_q_value = (
+            discounted_reward + self.gamma ** self.num_step * bootstrap_q[0]
+        )
+        priority_value = torch.abs(target_q_value - q_value).detach().view(-1)
+        priority_value = priority_value.cpu().numpy().tolist()
+
+        return nstep_data, priority_value
 
     def compute_priorities(self):
         pass
@@ -151,8 +171,8 @@ class ApeXWorker(Worker):
 
                 nstep_queue.append(transition)
                 if (len(nstep_queue) == self.num_step) or done:
-                    nstep_data = self.preprocess_data(nstep_queue)
-                    local_buffer.append(nstep_data)
+                    nstep_data, priorities = self.preprocess_data(nstep_queue)
+                    local_buffer.append([nstep_data, priorities])
 
                 state = next_state
 
