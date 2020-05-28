@@ -33,7 +33,7 @@ def read_config(config_path: str):
     return cfg, comm_cfg
 
 
-def create_env(env_name: str, atari: bool, max_episode_steps: Union[int, None]):
+def create_env(env_name: str, atari: bool, max_episode_steps=None):
     if atari:
         env = make_atari(env_name)
         env = wrap_deepmind(env)
@@ -41,8 +41,8 @@ def create_env(env_name: str, atari: bool, max_episode_steps: Union[int, None]):
     else:
         env = gym.make(env_name)
 
-    if max_episode_steps:
-        env = TimeLimit(env, max_episode_steps=1000)
+    if max_episode_steps is not None:
+        env = TimeLimit(env, max_episode_steps=max_episode_steps)
 
     return env
 

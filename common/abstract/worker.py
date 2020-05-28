@@ -144,7 +144,9 @@ class ApeXWorker(Worker):
         target_q_value = (
             discounted_reward + self.gamma ** self.num_step * bootstrap_q[0]
         )
+
         priority_value = torch.abs(target_q_value - q_value).detach().view(-1)
+        priority_value = torch.clamp(priority_value, min=1e-8)
         priority_value = priority_value.cpu().numpy().tolist()
 
         return nstep_data, priority_value
