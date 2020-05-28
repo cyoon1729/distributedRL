@@ -1,5 +1,6 @@
 import time
 from abc import ABC, abstractmethod
+from collections import deque
 from copy import deepcopy
 from typing import Union
 
@@ -79,7 +80,7 @@ class Learner(ABC):
         self.update_step = 0
         while True:
             self.recv_replay_data_()
-            replay_data = replay_data_queue.pop()
+            replay_data = self.replay_data_queue.pop()
             step_info, idxes, priorities = self.learning_step(replay_data)
             self.update_step = self.update_step + 1
             self.send_new_priorities(idxes, priorities)
