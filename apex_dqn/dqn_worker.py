@@ -43,21 +43,28 @@ class DQNWorker(ApeXWorker):
         update_interval = self.cfg["param_update_interval"]
 
         while True:
-            episode_reward = 0
+
+
             if self.receive_new_params():
                 update_step = update_step + update_interval
+
+                episode_reward = 0
                 state = self.env.reset()
                 done = False
-
-                while not done:
-                    self.env.render()
+                                
+                while True:
+                    #self.env.render()
                     action = self.select_action(state)
                     transition = self.environment_step(state, action)
                     next_state = transition[-2]
                     done = transition[-1]
                     reward = transition[-3]
-                    episode_reward += reward
+
+                    episode_reward = episode_reward + reward
                     state = next_state
+
+                    if done:
+                        break
 
                 print(f"Interim Test {update_step}: {episode_reward}")
 

@@ -61,6 +61,7 @@ class DQNLearner(Learner):
 
         step_info = (loss1, loss2)
         new_priorities = torch.abs(target_q - curr_q1).detach().view(-1)
+        new_priorities = torch.clamp(new_priorities, min=1e-8)
         new_priorities = new_priorities.cpu().numpy().tolist()
 
         return step_info, idxes, new_priorities
