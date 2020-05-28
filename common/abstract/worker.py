@@ -151,9 +151,6 @@ class ApeXWorker(Worker):
 
         return nstep_data, priority_value
 
-    def compute_priorities(self):
-        pass
-
     def collect_data(self, verbose=False):
         """Fill worker buffer until some stopping criterion is satisfied"""
         local_buffer = []

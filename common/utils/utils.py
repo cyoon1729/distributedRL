@@ -41,8 +41,8 @@ def create_env(env_name: str, atari: bool, max_episode_steps=None):
     else:
         env = gym.make(env_name)
 
-    if max_episode_steps is not None:
-        env = TimeLimit(env, max_episode_steps=max_episode_steps)
+    # if max_episode_steps is not None:
+    #     env = TimeLimit(env, max_episode_steps=max_episode_steps)
 
     return env
 

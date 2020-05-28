@@ -17,6 +17,7 @@ class Learner(ABC):
         self.cfg = learner_cfg
         self.device = self.cfg["learner_device"]
         self.brain = deepcopy(brain)
+        self.replay_data_queue = deque(maxlen=1000)
 
         # unpack communication configs
         self.param_update_interval = self.cfg["param_update_interval"]
@@ -66,7 +67,7 @@ class Learner(ABC):
     def recv_replay_data_(self):
         replay_data_id = self.rep_socket.recv()
         replay_data = pa.deserialize(replay_data_id)
-        return replay_data
+        self.replay_data_queue.append(replay_data)
 
     def send_new_priorities(self, idxes: np.ndarray, priorities: np.ndarray):
         new_priors = [idxes, priorities]
@@ -77,7 +78,8 @@ class Learner(ABC):
         time.sleep(3)
         self.update_step = 0
         while True:
-            replay_data = self.recv_replay_data_()
+            self.recv_replay_data_()
+            replay_data = replay_data_queue.pop()
             step_info, idxes, priorities = self.learning_step(replay_data)
             self.update_step = self.update_step + 1
             self.send_new_priorities(idxes, priorities)
