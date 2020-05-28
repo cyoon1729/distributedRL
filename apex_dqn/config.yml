@@ -10,7 +10,7 @@ num_workers: 8
 num_learners: 1
 num_step: 3
 batch_size: 512
-max_episode_steps: 300
+max_episode_steps: None
 param_update_interval: 10
 max_num_updates: 100000 
 tau: 0.01
