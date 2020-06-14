@@ -53,19 +53,33 @@ class PrioritizedReplayBufferHelper(object):
         self.rep_socket.send(batch_id)
 
         # receive and update priorities
-        new_priors_id = self.rep_socket.recv()
+        new_priors_id = self.rep_socket.recv()  # non blocking - zmq.DONTWAIT
         idxes, new_priorities = pa.deserialize(new_priors_id)
         self.buffer.update_priorities(idxes, new_priorities)
         # todo - support asynchronous priority updates
-        #  1. send batch (non-blocking) together with request_time_stamp
-        #  2. in the meanwhile, receive more data:
-        #       for each overridden idx in buffer.storage update write_time_stamp[idx]
-        #  3. receive idxes, new_priorities, request_time_stamp  (non-blocking)
-        #       for idx, new_priority in zip(idxes, new_priorities):
-        #           if write_time_stamp[idx] > request_time_stamp:
-        #               pass  # not relevant any more
+	#  0. in buffer.__init__ initialize buffer with 
+	#	self.unique_id_cnt = 0 
+	# 	self.unique_ids = np.zeros((self.capacity, ))
+	#  1. in buffer.add(new_replay_data) assign each new_replay_data a unique id (simply a running counter)
+	# 	self.unique_ids[idx] = self.unique_id_cnt
+	# 	self.unique_id_cnt = self.unique_id_cnt + 1
+        #  2. send batch (non-blocking) together with unique_ids
+	# 	idxes = self._sample_proportional(batch_size, beta)
+	# 	transitions = self.storage[idxes]
+	# 	weights = ... (corresponding weights)
+	# 	ids = self.unique_ids[idxes]
+	# 	return batch, weights, idxes, ids
+	#
+        #  3. in the meanwhile, receive more data, updating the unique id of each overriden position in the memory
+        #      
+        #  4. receive from learner (idxes, new_priorities, ids)  (non-blocking)
+        #       for idx, new_priority, id in zip(idxes, new_priorities, ids):
+        #           if self.unique_ids[idx] != id:
+        #               continue  # not relevant any more
         #           else:
         #               update new priorities
+	# in addition, support a pending requests queue on learner side, 
+	# so that the learner won't be idle between sending back new priorities and receiving a new batch. (it is mentioned in Ape-X appendix)
 
     def recv_data(self):
         new_replay_data_id = False
