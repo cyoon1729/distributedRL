@@ -46,10 +46,20 @@ class DQNLearner(Learner):
 
         bootstrap_q = bootstrap_q.view(bootstrap_q.size(0), 1)
         target_q = rewards + (1 - dones) * self.gamma ** self.num_step * bootstrap_q
-        weights = torch.FloatTensor(weights).to(self.device).mean()
 
-        loss1 = weights * F.mse_loss(curr_q1, target_q.detach())
-        loss2 = weights * F.mse_loss(curr_q2, target_q.detach())
+        # todo - bug:
+        #  the following lines are not importance sampling correction.
+        #  the correction should be done by the scalar product of the non-averaged weights vector and the
+        #  non-averaged loss vector:
+        #  loss1 = (weights * F.mse_loss(curr_q1, target_q.detach(), reduction='none')).mean()
+        #  The buggy code was:
+        #       weights = torch.FloatTensor(weights).to(self.device).mean()
+        #       loss1 = weights * F.mse_loss(curr_q1, target_q.detach())
+        #       loss2 = weights * F.mse_loss(curr_q2, target_q.detach())
+        #  The correct importance sampling correction is:
+        loss1 = (weights * F.mse_loss(curr_q1, target_q.detach(), reduction='none')).mean()
+        loss2 = (weights * F.mse_loss(curr_q2, target_q.detach(), reduction='none')).mean()
+        # todo - consider replace mse by F.smooth_l1_loss
 
         self.network_optimizer.zero_grad()
         loss1.backward()
@@ -67,6 +77,7 @@ class DQNLearner(Learner):
         return step_info, idxes, new_priorities
 
     def get_params(self):
+        # todo - the following copy is not needed
         model = deepcopy(self.network)
         model = model.cpu()
         return self.params_to_numpy(self.network)

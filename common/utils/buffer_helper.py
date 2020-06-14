@@ -56,6 +56,16 @@ class PrioritizedReplayBufferHelper(object):
         new_priors_id = self.rep_socket.recv()
         idxes, new_priorities = pa.deserialize(new_priors_id)
         self.buffer.update_priorities(idxes, new_priorities)
+        # todo - support asynchronous priority updates
+        #  1. send batch (non-blocking) together with request_time_stamp
+        #  2. in the meanwhile, receive more data:
+        #       for each overridden idx in buffer.storage update write_time_stamp[idx]
+        #  3. receive idxes, new_priorities, request_time_stamp  (non-blocking)
+        #       for idx, new_priority in zip(idxes, new_priorities):
+        #           if write_time_stamp[idx] > request_time_stamp:
+        #               pass  # not relevant any more
+        #           else:
+        #               update new priorities
 
     def recv_data(self):
         new_replay_data_id = False
@@ -68,7 +78,23 @@ class PrioritizedReplayBufferHelper(object):
             new_replay_data = pa.deserialize(new_replay_data_id)
             for replay_data, priorities in new_replay_data:
                 self.buffer.add(*replay_data)
-                self.buffer.update_priorities([len(self.buffer) - 1], priorities)
+                # todo - bug:
+                #  the index of the recently added data is not necessarily len(self.buffer)-1.
+                #  More accurately, it is len(self.buffer)-1 only when len(buffer) <= buffer._maxsize.
+                #  After filling the buffer to its full capacity, the indices cyclically return to zero in round robin.
+                #  The correct index to update is:
+                #       (self.buffer._next_index-1) % self.buffer._maxsize
+                #  The buggy code was
+                #       self.buffer.update_priorities([len(self.buffer) - 1], priorities)
+                #  and the correct index is
+                self.buffer.update_priorities([(self.buffer._next_idx - 1) % self.buffer._maxsize], priorities)
+                # todo - however,
+                #  the proper object-oriented way to update the initial priority is in the buffer class itself,
+                #  something like:
+                #       self.buffer.add(replay_data, initial_priority).
+                #  In a case the buffer insertion order is not round robin, but rather based on a
+                #  "least important criterion", the buffer._next_idx doesn't even exist,
+                #  so that the initial_priority must be updated in buffer.add
 
     def run(self):
         while True:

@@ -70,6 +70,13 @@ class ReplayBuffer(object):
             the end of an episode and 0 otherwise.
         """
         idxes = [random.randint(0, len(self._storage) - 1) for _ in range(batch_size)]
+        # todo - the sampling above can sample the same index twice.
+        #  better to sample unique elements with random.sample
+        #  like:
+        idxes = random.sample(np.arange(len(self._storage)), batch_size)
+        # todo or even to sample data_list directly from the storage
+        #  and adapt _encode sample accordingly to get data_list as input instead of indices.
+        data_list = random.sample(self._storage, batch_size)
         return self._encode_sample(idxes)
 
 
@@ -102,12 +109,15 @@ class PrioritizedReplayBuffer(ReplayBuffer):
 
     def add(self, *args, **kwargs):
         """See ReplayBuffer.store_effect"""
+        # todo - not safe to store the data separately from its priority.
+        #  see safety issue in PrioritizedReplayBufferHelper line
         idx = self._next_idx
         super().add(*args, **kwargs)
         self._it_sum[idx] = self._max_priority ** self._alpha
         self._it_min[idx] = self._max_priority ** self._alpha
 
     def _sample_proportional(self, batch_size):
+        # todo - what is going on here?
         res = []
         p_total = self._it_sum.sum(0, len(self._storage) - 1)
         every_range_len = p_total / batch_size
