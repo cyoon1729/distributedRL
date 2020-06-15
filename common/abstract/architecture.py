@@ -21,3 +21,10 @@ class Architecture(ABC):
     def train(self):
         """Run main training loop"""
         pass
+
+    # @abstractmethod
+    # def load_params(self, path: str):
+    #     if not os.path.exists(path):
+    #         raise Exception(
+    #             f"[ERROR] the input path does not exist. Wrong path: {path}"
+    #         )

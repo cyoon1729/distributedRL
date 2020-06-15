@@ -151,7 +151,7 @@ class ApeXWorker(Worker):
 
         return nstep_data, priority_value
 
-    def collect_data(self, verbose=False):
+    def collect_data(self, verbose=True):
         """Fill worker buffer until some stopping criterion is satisfied"""
         local_buffer = []
         nstep_queue = deque(maxlen=self.num_step)
@@ -161,6 +161,7 @@ class ApeXWorker(Worker):
             done = False
             state = self.env.reset()
             while not done:
+                self.env.render()
                 action = self.select_action(state)
                 transition = self.environment_step(state, action)
                 next_state = transition[-2]

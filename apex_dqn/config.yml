@@ -6,7 +6,7 @@ atari: True
 model: Apex-DQN
 learner_device: cuda
 worker_device: cpu
-num_workers: 10
+num_workers: 8
 num_learners: 1
 num_step: 3
 batch_size: 512
@@ -16,8 +16,11 @@ max_num_updates: 100000
 tau: 0.01
 learning_rate: 0.0001
 gamma: 0.95
-eps_greedy: 0.20
+eps_greedy: 0.30
 eps_decay: 0.95
+gradient_clip: 10
+q_regularization: 0.0
+multiple_updates: 4
 
 # Buffer parameters
 buffer_max_size: 1000000 

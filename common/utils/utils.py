@@ -16,7 +16,7 @@ def read_config(config_path: str):
 
     if cfg["atari"] is True:
         env = make_atari(cfg["env_name"])
-        env = wrap_deepmind(env)
+        env = wrap_deepmind(env, frame_stack=True)
         env = wrap_pytorch(env)
     else:
         env = gym.make(cfg["env_name"])
@@ -36,7 +36,7 @@ def read_config(config_path: str):
 def create_env(env_name: str, atari: bool, max_episode_steps=None):
     if atari:
         env = make_atari(env_name)
-        env = wrap_deepmind(env)
+        env = wrap_deepmind(env, frame_stack=True)
         env = wrap_pytorch(env)
     else:
         env = gym.make(env_name)

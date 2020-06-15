@@ -68,7 +68,7 @@ class PrioritizedReplayBufferHelper(object):
             new_replay_data = pa.deserialize(new_replay_data_id)
             for replay_data, priorities in new_replay_data:
                 self.buffer.add(*replay_data)
-                self.buffer.update_priorities([len(self.buffer) - 1], priorities)
+                self.buffer.update_priorities([(self.buffer._next_idx - 1) % self.buffer._maxsize], priorities)
 
     def run(self):
         while True:

@@ -51,7 +51,7 @@ class DQNWorker(ApeXWorker):
                 done = False
 
                 while True:
-                    #self.env.render()
+                    self.env.render()
                     action = self.select_action(state)
                     transition = self.environment_step(state, action)
                     next_state = transition[-2]

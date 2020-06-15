@@ -2,6 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from collections import deque
 from copy import deepcopy
+from datetime import datetime
 from typing import Union
 
 import numpy as np
@@ -9,6 +10,7 @@ import pyarrow as pa
 import torch
 import torch.nn as nn
 import zmq
+from zmq.sugar.stopwatch import Stopwatch
 
 
 class Learner(ABC):
@@ -77,12 +79,22 @@ class Learner(ABC):
 
     def run(self):
         time.sleep(3)
+        tracker = Stopwatch()
         self.update_step = 0
         while True:
             self.recv_replay_data_()
+            # tracker.start()
             replay_data = self.replay_data_queue.pop()
-            step_info, idxes, priorities = self.learning_step(replay_data)
+            # if self.update_step == 0:
+            #     self.starttime = datetime.now() 
+                # print(f"Start time: {self.starttime}")
+            for _ in range(self.cfg["multiple_updates"]):
+                step_info, idxes, priorities = self.learning_step(replay_data)
+            # print(tracker.stop())
+            # if self.update_step % 100 == 0:
+            #     print(f"Update Step: {self.update_step} Time elapsed: {datetime.now() - self.starttime}")
             self.update_step = self.update_step + 1
+
             self.send_new_priorities(idxes, priorities)
 
             if self.update_step % self.param_update_interval == 0:

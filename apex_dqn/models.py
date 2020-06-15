@@ -10,7 +10,7 @@ class ConvDuelingDQN(nn.Module):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.conv = nn.Sequential(
-            nn.Conv2d(self.input_dim[0], 32, kernel_size=8, stride=4),
+            nn.Conv2d(4, 32, kernel_size=8, stride=4),
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
@@ -21,13 +21,15 @@ class ConvDuelingDQN(nn.Module):
         self.fc_input_dim = self.feature_size()
 
         self.value_stream = nn.Sequential(
-            nn.Linear(self.fc_input_dim, 128), nn.ReLU(), nn.Linear(128, 1)
+            nn.Linear(self.fc_input_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1)
         )
 
         self.advantage_stream = nn.Sequential(
-            nn.Linear(self.fc_input_dim, 128),
+            nn.Linear(self.fc_input_dim, 512),
             nn.ReLU(),
-            nn.Linear(128, self.output_dim),
+            nn.Linear(512, self.output_dim),
         )
 
     def forward(self, state):
