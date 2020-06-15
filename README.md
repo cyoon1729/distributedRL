@@ -31,7 +31,7 @@ pip install -e .
 *To be added*
 
 ### Acknowledgements
-I thank @Avrech for his helpful discussion, suggestions and enhancements. In particular, on identifying bugs and bottlenecks and improving asynchrony of the Ape-X implementation.
+I thank [@Avrech](https://github.com/avrech) for his helpful discussion, suggestions and enhancements. In particular, on identifying bugs and bottlenecks and improving asynchrony of the Ape-X implementation.
 
 ### References/Papers:
 - [Distributed Prioritized Experience Replay (Horgan et al., 2018), ICLR 2018](https://arxiv.org/abs/1803.00933)
