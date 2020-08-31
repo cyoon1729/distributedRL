@@ -33,9 +33,6 @@ class ApeX(Architecture):
             self.worker_cls.remote(n, self.worker_brain, self.cfg, self.comm_cfg)
             for n in range(1, self.num_workers + 1)
         ]
-        # self.performance_worker = self.worker_cls.remote(
-        #     "Test", self.worker_brain, self.cfg, self.comm_cfg
-        # )
         self.learner = self.learner_cls.remote(self.brain, self.cfg, self.comm_cfg)
         self.global_buffer = PrioritizedReplayBufferHelper.remote(
             self.cfg, self.comm_cfg
@@ -43,9 +40,6 @@ class ApeX(Architecture):
         self.all_actors = self.workers + [self.learner] + [self.global_buffer]
 
     def train(self):
+        # TODO: implement a safer exit
         print("Running main training loop...")
-        ray.wait(
-            [actor.run.remote() for actor in self.all_actors]
-        )
-
-                    # + [self.performance_worker.test_run.remote()]
+        ray.wait([actor.run.remote() for actor in self.all_actors])

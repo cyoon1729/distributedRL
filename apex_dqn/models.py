@@ -21,9 +21,7 @@ class ConvDuelingDQN(nn.Module):
         self.fc_input_dim = self.feature_size()
 
         self.value_stream = nn.Sequential(
-            nn.Linear(self.fc_input_dim, 512),
-            nn.ReLU(),
-            nn.Linear(512, 1)
+            nn.Linear(self.fc_input_dim, 512), nn.ReLU(), nn.Linear(512, 1)
         )
 
         self.advantage_stream = nn.Sequential(

@@ -6,8 +6,7 @@ import torch
 import yaml
 from gym.wrappers import TimeLimit
 
-from common.utils.baseline_wrappers import (make_atari, wrap_deepmind,
-                                            wrap_pytorch)
+from common.utils.baseline_wrappers import make_atari, wrap_deepmind, wrap_pytorch
 
 
 def read_config(config_path: str):
@@ -40,9 +39,6 @@ def create_env(env_name: str, atari: bool, max_episode_steps=None):
         env = wrap_pytorch(env)
     else:
         env = gym.make(env_name)
-
-    # if max_episode_steps is not None:
-    #     env = TimeLimit(env, max_episode_steps=max_episode_steps)
 
     return env
 

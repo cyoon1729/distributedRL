@@ -68,15 +68,3 @@ class DQNWorker(ApeXWorker):
 
             else:
                 pass
-
-
-"""
-        test_state = torch.FloatTensor(
-            self.env.reset()
-        ).unsqueeze(0).to(self.device)
-        test_output = self.brain.forward(test_state)
-        while True:
-            if self.receive_new_params():
-                output = self.brain.forward(test_state)
-                print(test_output.squeeze(0) - output.squeeze(0))
-"""
