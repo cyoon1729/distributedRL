@@ -1,7 +1,7 @@
 # distributedRL
 
 
-distributedRL is a framework for prototyping disrtibuted reinforcement learning using **Pytorch**, **Ray**, and **ZeroMQ** (and more). You can make use of the structural components to easily distribute your reinforcement learning algorithm, on a single-machine.
+distributedRL is a framework for prototyping distributed reinforcement learning using **Pytorch**, **Ray**, and **ZeroMQ** (and more). You can make use of the structural components to easily distribute your reinforcement learning algorithm, on a single-machine.
 
 Currently, an implementation of *Ape-X DQN* is available. *IMPALA* and *SEED* are planned to be implemented. 
 
